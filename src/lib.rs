@@ -46,6 +46,9 @@ const IDA_SHIFT: usize = 6;
 const IDA_BITMAP_BITS: usize = 1 << IDA_SHIFT;
 // This calculation is the integer division equivalent of `ceil(64 / IDA_SHIFT)`
 // and ensures that we have enough levels to cover the entire 64-bit ID space.
+// We intentionally use this arithmetic to maintain compatibility with older Rust versions
+// that do not have the `div_ceil` function stabilized.
+#[allow(clippy::manual_div_ceil)]
 const IDA_MAX_LEVELS: usize = (64 + IDA_SHIFT - 1) / IDA_SHIFT;
 
 #[derive(Debug)]
