@@ -51,6 +51,57 @@ const IDA_BITMAP_BITS: usize = 1 << IDA_SHIFT;
 #[allow(clippy::manual_div_ceil)]
 const IDA_MAX_LEVELS: usize = (64 + IDA_SHIFT - 1) / IDA_SHIFT;
 
+/// A thread-safe ID allocator for sparse ID spaces.
+///
+/// `Ida` (ID Allocator) manages a pool of unique integer IDs, implemented as a
+/// radix tree for memory efficiency. It's particularly well-suited for scenarios
+/// where allocated IDs may be far apart (e.g., allocating IDs 5 and 5,000,000).
+///
+/// # Thread Safety
+///
+/// All methods are thread-safe and can be safely shared across threads using `Arc`.
+/// The implementation uses a spinlock internally for synchronization.
+///
+/// # Memory Efficiency
+///
+/// The radix tree structure ensures that only allocated regions of the ID space
+/// consume memory. Sparse allocations do not waste space on unallocated ranges.
+///
+/// # Examples
+///
+/// Basic usage:
+/// ```
+/// use ida_rs::Ida;
+///
+/// let ida = Ida::new();
+/// let id1 = ida.alloc().unwrap();
+/// let id2 = ida.alloc().unwrap();
+/// ida.free(id1);
+/// let id3 = ida.alloc().unwrap(); // Reuses id1
+/// ```
+///
+/// Multi-threaded usage:
+/// ```
+/// use ida_rs::Ida;
+/// use std::sync::Arc;
+/// use std::thread;
+///
+/// let ida = Arc::new(Ida::new());
+/// let mut handles = vec![];
+///
+/// for _ in 0..4 {
+///     let ida_clone = Arc::clone(&ida);
+///     let handle = thread::spawn(move || {
+///         ida_clone.alloc()
+///     });
+///     handles.push(handle);
+/// }
+///
+/// for handle in handles {
+///     let id = handle.join().unwrap();
+///     println!("Allocated ID: {:?}", id);
+/// }
+/// ```
 #[derive(Debug)]
 pub struct Ida {
     root: Mutex<IdaNode>,
@@ -162,23 +213,149 @@ impl IdaNode {
 }
 
 impl Ida {
+    /// Creates a new, empty ID allocator.
+    ///
+    /// The allocator starts with no IDs allocated. The first call to [`alloc`](Self::alloc)
+    /// will return ID `0`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use ida_rs::Ida;
+    ///
+    /// let ida = Ida::new();
+    /// assert_eq!(ida.alloc(), Some(0));
+    /// ```
     pub fn new() -> Self {
         Self {
             root: Mutex::new(IdaNode::new()),
         }
     }
 
+    /// Allocates and returns the next available ID.
+    ///
+    /// This method always returns the lowest available ID. If an ID has been freed,
+    /// it will be reused before allocating higher IDs.
+    ///
+    /// # Returns
+    ///
+    /// - `Some(id)` - The allocated ID (a `usize` value)
+    /// - `None` - If the allocator has exhausted the available ID space
+    ///
+    /// # Thread Safety
+    ///
+    /// This method is thread-safe and can be called concurrently from multiple threads.
+    /// Each call is guaranteed to return a unique ID.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use ida_rs::Ida;
+    ///
+    /// let ida = Ida::new();
+    ///
+    /// // Allocate IDs sequentially
+    /// let id1 = ida.alloc().unwrap();
+    /// let id2 = ida.alloc().unwrap();
+    /// assert_eq!(id1, 0);
+    /// assert_eq!(id2, 1);
+    ///
+    /// // Free an ID and reallocate
+    /// ida.free(id1);
+    /// let id3 = ida.alloc().unwrap();
+    /// assert_eq!(id3, 0); // Reuses the freed ID
+    /// ```
     pub fn alloc(&self) -> Option<usize> {
         let mut root = self.root.lock();
         root.alloc(IDA_MAX_LEVELS - 1)
     }
 
+    /// Frees a previously allocated ID, making it available for reuse.
+    ///
+    /// Once freed, the ID becomes available for future allocations. The next call
+    /// to [`alloc`](Self::alloc) will prefer reusing freed IDs before allocating
+    /// new ones.
+    ///
+    /// # Parameters
+    ///
+    /// - `id` - The ID to free. Must be a value that was previously returned by
+    ///   [`alloc`](Self::alloc).
+    ///
+    /// # Behavior
+    ///
+    /// - Freeing an already-free ID is safe but has no effect
+    /// - Freeing an ID that was never allocated is safe but has no effect
+    /// - After freeing, the internal tree structure may be compacted to save memory
+    ///
+    /// # Thread Safety
+    ///
+    /// This method is thread-safe and can be called concurrently from multiple threads.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use ida_rs::Ida;
+    ///
+    /// let ida = Ida::new();
+    /// let id = ida.alloc().unwrap();
+    ///
+    /// // Use the ID...
+    ///
+    /// // Free it when done
+    /// ida.free(id);
+    ///
+    /// // The ID can now be reallocated
+    /// let reused_id = ida.alloc().unwrap();
+    /// assert_eq!(id, reused_id);
+    /// ```
     pub fn free(&self, id: usize) {
         let mut root = self.root.lock();
         root.free(id, IDA_MAX_LEVELS - 1);
     }
 
     /// Checks if a given ID is currently allocated.
+    ///
+    /// This method queries whether a specific ID has been allocated and not yet freed.
+    /// It's useful for debugging, validation, or tracking ID states.
+    ///
+    /// # Parameters
+    ///
+    /// - `id` - The ID to check
+    ///
+    /// # Returns
+    ///
+    /// - `true` - If the ID is currently allocated
+    /// - `false` - If the ID is free or has never been allocated
+    ///
+    /// # Thread Safety
+    ///
+    /// This method is thread-safe and provides a consistent view at the time of the call.
+    /// Note that in concurrent scenarios, the status may change immediately after this
+    /// method returns.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use ida_rs::Ida;
+    ///
+    /// let ida = Ida::new();
+    ///
+    /// // Initially, no IDs are allocated
+    /// assert!(!ida.is_allocated(0));
+    /// assert!(!ida.is_allocated(100));
+    ///
+    /// // Allocate an ID
+    /// let id = ida.alloc().unwrap();
+    /// assert_eq!(id, 0);
+    ///
+    /// // Check allocation status
+    /// assert!(ida.is_allocated(0));
+    /// assert!(!ida.is_allocated(1));
+    ///
+    /// // Free the ID
+    /// ida.free(0);
+    /// assert!(!ida.is_allocated(0));
+    /// ```
     pub fn is_allocated(&self, id: usize) -> bool {
         let root = self.root.lock();
         root.is_allocated(id, IDA_MAX_LEVELS - 1)
@@ -186,6 +363,18 @@ impl Ida {
 }
 
 impl Default for Ida {
+    /// Creates a new ID allocator using the default configuration.
+    ///
+    /// This is equivalent to calling [`Ida::new()`](Self::new).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use ida_rs::Ida;
+    ///
+    /// let ida = Ida::default();
+    /// assert_eq!(ida.alloc(), Some(0));
+    /// ```
     fn default() -> Self {
         Self::new()
     }
