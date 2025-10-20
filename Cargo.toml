@@ -2,6 +2,11 @@
 name = "ida"
 version = "0.1.0"
 edition = "2024"
+description = "A thread-safe, no_std, sparse ID allocator using a radix tree. Ideal for systems programming."
+license = "MIT OR Apache-2.0"
+readme = "README.md"
+keywords = ["id", "allocator", "no_std", "sparse", "kernel"]
+categories = ["no-std", "data-structures", "concurrency"]
 
 [dependencies]
 spin = "0.10.0"
