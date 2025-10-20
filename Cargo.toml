@@ -1,5 +1,5 @@
 [package]
-name = "ida"
+name = "ida-rs"
 version = "0.1.0"
 edition = "2024"
 description = "A thread-safe, no_std, sparse ID allocator using a radix tree. Ideal for systems programming."
