@@ -1,0 +1,21 @@
+{
+    "[rust]": {
+        "editor.defaultFormatter": "rust-lang.rust-analyzer",
+        "editor.formatOnSave": true,
+        "editor.codeActionsOnSave": {
+            "source.organizeImports": "explicit"
+        }
+    },
+    "rust-analyzer.check.command": "clippy",
+    "rust-analyzer.check.extraArgs": [
+        "--",
+        "-D",
+        "warnings"
+    ],
+    "rust-analyzer.rustfmt.extraArgs": [
+        "+nightly"
+    ],
+    "files.watcherExclude": {
+        "**/target/**": true
+    }
+}
