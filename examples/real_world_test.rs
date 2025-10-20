@@ -1,4 +1,4 @@
-use ida::Ida;
+use ida_rs::Ida;
 use std::sync::Arc;
 use std::thread;
 
@@ -39,7 +39,7 @@ fn main() {
 
     println!("\nAll threads finished.");
     println!("Total IDs allocated: {}", all_ids.len());
-    println!("Allocated IDs: {:?}", all_ids);
+    println!("Allocated IDs: {all_ids:?}");
 
     // Verify correctness: sort and check for duplicates
     all_ids.sort();

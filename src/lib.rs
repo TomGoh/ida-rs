@@ -3,7 +3,7 @@
 //!
 //! # An ID Allocator for Sparse ID Spaces
 //!
-//! `ida` provides a thread-safe, `no_std` compatible ID allocator suitable for
+//! `ida-rs` provides a thread-safe, `no_std` compatible ID allocator suitable for
 //! systems-level programming, such as in OS kernels or embedded environments.
 //!
 //! It is implemented as a radix tree, which makes it highly memory-efficient
@@ -17,7 +17,7 @@
 //!
 //! ## Example
 //! ```
-//! use ida::Ida;
+//! use ida_rs::Ida;
 //!
 //! let ida = Ida::new();
 //!
@@ -46,7 +46,7 @@ const IDA_SHIFT: usize = 6;
 const IDA_BITMAP_BITS: usize = 1 << IDA_SHIFT;
 // This calculation is the integer division equivalent of `ceil(64 / IDA_SHIFT)`
 // and ensures that we have enough levels to cover the entire 64-bit ID space.
-const IDA_MAX_LEVELS: usize = 64_usize.div_ceil(IDA_SHIFT);
+const IDA_MAX_LEVELS: usize = (64 + IDA_SHIFT - 1) / IDA_SHIFT;
 
 #[derive(Debug)]
 pub struct Ida {

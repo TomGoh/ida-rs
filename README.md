@@ -1,6 +1,6 @@
-# ida: An ID Allocator for Sparse ID Spaces
+# ida-rs: An ID Allocator for Sparse ID Spaces
 
-`ida` provides a thread-safe, `no_std` compatible ID allocator suitable for
+`ida-rs` provides a thread-safe, `no_std` compatible ID allocator suitable for
 systems-level programming, such as in OS kernels or embedded environments.
 
 It is implemented as a radix tree, which makes it highly memory-efficient
@@ -14,7 +14,7 @@ without allocating the space in between).
 
 ## Example
 ```rust
-use ida::Ida;
+use ida_rs::Ida;
 
 let ida = Ida::new();
 
