@@ -46,7 +46,7 @@ const IDA_SHIFT: usize = 6;
 const IDA_BITMAP_BITS: usize = 1 << IDA_SHIFT;
 // This calculation is the integer division equivalent of `ceil(64 / IDA_SHIFT)`
 // and ensures that we have enough levels to cover the entire 64-bit ID space.
-const IDA_MAX_LEVELS: usize = (64 + IDA_SHIFT - 1) / IDA_SHIFT;
+const IDA_MAX_LEVELS: usize = 64_usize.div_ceil(IDA_SHIFT);
 
 #[derive(Debug)]
 pub struct Ida {
