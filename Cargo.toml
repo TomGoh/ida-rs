@@ -1,6 +1,6 @@
 [package]
 name = "ida-rs"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 description = "A thread-safe, no_std, sparse ID allocator using a radix tree. Ideal for systems programming."
 repository = "https://github.com/TomGoh/ida-rs"
